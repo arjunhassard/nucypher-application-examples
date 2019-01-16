@@ -2,6 +2,7 @@ from dash.dependencies import Output, Input, State, Event
 import dash_table
 import dash_core_components as dcc
 import dash_html_components as html
+import json
 import msgpack
 import os
 import pandas as pd
@@ -25,14 +26,14 @@ layout = html.Div([
     html.Div([
         html.Div([
             html.Div([
-                html.Img(src='./assets/enrico.png'),
+                html.Img(src='./assets/enrico.png', style={'height': '150px', 'width': '220px'}),
             ], className='two columns'),
             html.Div([
                 html.Div([
                     html.H2('ENRICO'),
-                    html.P("Enrico is the Heart Monitor that uses a data policy key to encrypt Alicia's "
-                           "heart rate measurements readings into a database or some storage service "
-                           "(e.g., IPFS, S3, whatever). Data Sources like the Heart Monitor remain "
+                    html.P("Enrico is the OBD device in Alicia's vehicle that uses a data policy key "
+                           "to encrypt Alicia's vehicular measurements into a database or some storage service "
+                           "(e.g., IPFS, S3, whatever). Data Sources like the OBD device remain "
                            "completely unaware of the recipients. In their mind, they are producing data "
                            "for Alicia. "),
                 ], className="row")
@@ -46,14 +47,14 @@ layout = html.Div([
         dcc.Input(id='policy-pub-key', type='text', className='seven columns'),
         html.Button('Start Monitoring', id='generate-button', type='submit',
                     className="button button-primary", n_clicks_timestamp='0'),
-        dcc.Interval(id='gen-heartbeat-update', interval=1000, n_intervals=0),
+        dcc.Interval(id='gen-measurements-update', interval=1000, n_intervals=0),
     ], className='row'),
     html.Hr(),
     html.Div([
-        html.H3('Encrypted Heartbeat Data in Database ❤'),
+        html.H3('Encrypted OBD Data in Database'),
         html.Div([
-            html.Div('Latest Heartbeat (❤ bpm): ', className='two columns'),
-            html.Div(id='cached-last-heartbeat', className='one column'),
+            html.Div('Latest Vehicle Data: ', className='two columns'),
+            html.Div(id='cached-last-readings', className='two columns'),
         ], className='row'),
         html.Br(),
         html.H5('Last 30s of Data: '),
@@ -63,20 +64,20 @@ layout = html.Div([
 
 
 @app.callback(
-    Output('cached-last-heartbeat', 'children'),
+    Output('cached-last-readings', 'children'),
     [],
     [State('generate-button', 'n_clicks_timestamp'),
      State('policy-pub-key', 'value'),
-     State('cached-last-heartbeat', 'children')],
-    [Event('gen-heartbeat-update', 'interval'),
+     State('cached-last-readings', 'children')],
+    [Event('gen-measurements-update', 'interval'),
      Event('generate-button', 'click')]
 )
-def generate_heartbeat_data(gen_time, policy_pubkey_hex, last_heart_rate):
+def generate_vehicular_data(gen_time, policy_pubkey_hex, cached_last_reading):
     if int(gen_time) == 0:
         # button has not been clicked as yet or interval triggered before click
         return None
 
-    label = 'heart-data'
+    label = 'vehicle-data'
 
     policy_pubkey = UmbralPublicKey.from_bytes(bytes.fromhex(policy_pubkey_hex))
     if not cached_data_source:
@@ -92,15 +93,9 @@ def generate_heartbeat_data(gen_time, policy_pubkey_hex, last_heart_rate):
     else:
         data_source = cached_data_source[0]
 
-    if last_heart_rate is not None:
-        last_heart_rate = int(last_heart_rate)
-    else:
-        last_heart_rate = 80
+    latest_reading = generate_new_reading(cached_last_reading)
 
-    heart_rate = random.randint(max(60, last_heart_rate - 5),
-                                min(100, last_heart_rate + 5))
-
-    plaintext = msgpack.dumps(heart_rate, use_bin_type=True)
+    plaintext = msgpack.dumps(latest_reading, use_bin_type=True)
     message_kit, _signature = data_source.encrypt_message(plaintext)
     kit_bytes = message_kit.to_bytes()
 
@@ -110,23 +105,23 @@ def generate_heartbeat_data(gen_time, policy_pubkey_hex, last_heart_rate):
         'EncryptedData': [kit_bytes.hex()],
     })
 
-    # add new heartbeat data
+    # add new vehicle data
     db_conn = sqlite3.connect(DB_FILE)
     try:
         df.to_sql(name=DB_NAME, con=db_conn, index=False, if_exists='append')
-        print("Added heart rate️ measurement to db:", timestamp, "-> ❤", heart_rate)
+        print("Added vehicle sensor readings to db:", timestamp, " -> ", latest_reading)
     finally:
         db_conn.close()
 
-    return heart_rate
+    return json.dumps(latest_reading)
 
 
 @app.callback(
     Output('db-table-content', 'children'),
-    [Input('cached-last-heartbeat', 'children')]
+    [Input('cached-last-readings', 'children')]
 )
-def display_heartbeat_data(cached_last_heartbeat):
-    if cached_last_heartbeat is None:
+def display_vehicular_data(cached_last_reading):
+    if cached_last_reading is None:
         # button hasn't been clicked as yet
         return ''
 
@@ -166,3 +161,35 @@ def display_heartbeat_data(cached_last_heartbeat):
                     }],
                 )
            ], className='row')
+
+
+def generate_new_reading(cached_last_reading) -> dict:
+    car_data = dict()
+    sensor_readings = dict()
+    car_data['carInfo'] = sensor_readings
+
+    if cached_last_reading is None:
+        # generate readings
+        sensor_readings['engineOn'] = True
+        sensor_readings['temp'] = random.randrange(180, 230)
+        sensor_readings['rpm'] = random.randrange(1000, 7500)
+        sensor_readings['vss'] = random.randrange(10, 80)
+        sensor_readings['maf'] = random.randrange(10, 20)
+        sensor_readings['throttlepos'] = random.randrange(10, 90)
+        sensor_readings['lat'] = random.randrange(30, 40)
+        sensor_readings['lon'] = random.randrange(-100, -80)
+        sensor_readings['alt'] = random.randrange(40, 50)
+        sensor_readings['gpsSpeed'] = random.randrange(30, 140)
+        sensor_readings['course'] = random.randrange(100, 180)
+        sensor_readings['gpsTime'] = time.time()
+    else:
+        last_sensor_readings = json.loads(cached_last_reading)['carInfo']
+        for key in last_sensor_readings.keys():
+            if key in ['engineOn']:
+                # skip boolean value
+                sensor_readings['engineOn'] = last_sensor_readings[key]
+            else:
+                # modify reading based on prior value
+                sensor_readings[key] = last_sensor_readings[key] + random.uniform(-1, 1)
+
+    return car_data

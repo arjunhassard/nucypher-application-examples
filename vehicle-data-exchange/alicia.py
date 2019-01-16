@@ -91,9 +91,10 @@ layout = html.Div([
             html.Div([
                 html.Div([
                     html.H2('ALICIA'),
-                    html.P('Alicia has a Heart Monitor device (Enrico) that measures her heart '
-                           'rate and outputs this data in encrypted form. She thinks that at some '
-                           'point in the future she may want to share this data with her doctor.')
+                    html.P('Alicia has a OBD device in her vehicle (Enrico) that obtains readings from a '
+                           'variety of sensors and outputs this data in encrypted form. She thinks '
+                           'that at some point in the future she may want to share this data with '
+                           'her Insurance company.')
                 ], className="row")
             ], className='five columns'),
         ], className='row'),
@@ -148,7 +149,7 @@ layout = html.Div([
     events=[Event('create-policy-button', 'click')]
 )
 def create_policy():
-    label = 'heart-data'
+    label = 'vehicle-data'
     label = label.encode()
 
     policy_pubkey = alicia.get_policy_pubkey_from_label(label)
@@ -169,11 +170,11 @@ def create_policy():
      Event('revoke-button', 'click')]
 )
 def grant_access(revoke_time, grant_time, days, m, n, recipient_pubkey_hex):
+    label = b'vehicle-data'
+
     if int(revoke_time) >= int(grant_time):
         # either triggered at start or because revoke was executed
         return ''
-
-    label = b'heart-data'
 
     # Alicia now wants to share data associated with this label.
     # To do so, she needs the public key of the recipient.

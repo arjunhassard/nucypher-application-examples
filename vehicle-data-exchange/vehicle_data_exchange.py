@@ -19,14 +19,14 @@ index_page = html.Div([
     ], className='banner'),
     html.A('ALICIA', href='/alicia', target='_blank'),
     html.Br(),
-    html.A('ENRICO (HEART_MONITOR)', href='/enrico', target='_blank'),
+    html.A('ENRICO (OBD DEVICE)', href='/enrico', target='_blank'),
     html.Br(),
-    html.A('DR. BOB', href='/bob', target='_blank'),
+    html.A('INSURER BOB', href='/bob', target='_blank'),
     html.Br(),
     html.Hr(),
     html.H2('Overview'),
     html.Div([
-        html.Img(src='./assets/heartbeat_demo_overview.png'),
+        html.Img(src='./assets/vehicle_demo_overview.png'),
     ], className='overview')
 ])
 
